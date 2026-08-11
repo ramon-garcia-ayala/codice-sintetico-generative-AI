@@ -61,12 +61,20 @@ def record_from_page(page: dict, klass: ImageClass, hint: str) -> ImageRecord | 
     if hint not in categories:
         categories.append(hint)
 
-    # `File:Nombre con espacios.jpg` -> `wm_nombre_con_espacios.jpg`
+    # `File:Nombre con espacios.jpg` -> `wm_<pageid>_nombre_con_espacios.jpg`
+    #
+    # El `pageid` no es decorativo: sin él la sanitización colapsa títulos
+    # distintos en el mismo nombre ("Cliff, Spain.jpg" y "Cliff Spain.jpg" son
+    # dos archivos distintos de Commons, con autores y licencias distintas, y
+    # ambos producen `wm_cliff_spain.jpg`). Como el manifest y el disco están
+    # indexados por filename, esa colisión hacía que un record sobrescribiera
+    # al otro y publicara la atribución equivocada.
     stem = title.removeprefix("File:")
     safe = re.sub(r"[^\w.-]+", "_", stem).strip("_").lower()
+    pageid = page.get("pageid", "")
 
     return ImageRecord(
-        filename=f"wm_{safe}",
+        filename=f"wm_{pageid}_{safe}" if pageid else f"wm_{safe}",
         source="wikimedia",
         source_id=str(page.get("pageid", "")),
         origin_title=title,

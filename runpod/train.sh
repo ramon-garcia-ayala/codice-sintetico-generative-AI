@@ -10,9 +10,18 @@ set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 KOHYA_DIR="$WORKSPACE/sd-scripts"
-CONFIG="${CONFIG:-$(dirname "$0")/train_codice_geo.toml}"
+# Ruta absoluta: más abajo se hace `cd "$KOHYA_DIR"` antes de lanzar el
+# entrenamiento, así que un `--config_file` relativo se resolvería contra el
+# directorio de sd-scripts y no existiría.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG="${CONFIG:-$SCRIPT_DIR/train_codice_geo.toml}"
 VERSION="${VERSION:-v1}"
 DATASET="$WORKSPACE/dataset/train"
+
+if [ ! -f "$CONFIG" ]; then
+    echo "error: no existe el config $CONFIG" >&2
+    exit 1
+fi
 
 # shellcheck disable=SC1091
 source "$WORKSPACE/venv/bin/activate"
@@ -40,9 +49,24 @@ done
 echo "    -> $total vistas por epoca"
 
 EXTRA=()
+RUN_CONFIG="$CONFIG"
 if [ "${1:-}" = "--smoke" ]; then
     echo ""
     echo "==> Prueba de humo: 10 pasos"
+    # sd-scripts recalcula max_train_steps a partir de max_train_epochs siempre
+    # que este último esté definido, así que pasar --max_train_steps=10 por CLI
+    # no basta: el TOML fija 12 épocas y la "prueba rápida" acababa corriendo el
+    # entrenamiento entero. La única forma de que 10 pasos signifique 10 pasos
+    # es que max_train_epochs no exista en ninguna de las dos fuentes.
+    RUN_CONFIG="$WORKSPACE/train_codice_geo.smoke.toml"
+    sed -e '/^[[:space:]]*max_train_epochs[[:space:]]*=/d' \
+        -e '/^[[:space:]]*sample_every_n_epochs[[:space:]]*=/d' \
+        "$CONFIG" > "$RUN_CONFIG"
+
+    if grep -qE '^[[:space:]]*max_train_epochs[[:space:]]*=' "$RUN_CONFIG"; then
+        echo "error: no se pudo quitar max_train_epochs del config de humo" >&2
+        exit 1
+    fi
     EXTRA=(--max_train_steps=10 --save_every_n_epochs=999 --output_name="smoke_test")
 else
     EXTRA=(--output_name="codice_geo_$VERSION")
@@ -66,7 +90,7 @@ echo "==> Entrenando"
 accelerate launch \
     --num_cpu_threads_per_process 4 \
     sdxl_train_network.py \
-    --config_file "$CONFIG" \
+    --config_file "$RUN_CONFIG" \
     "${EXTRA[@]}"
 
 echo ""

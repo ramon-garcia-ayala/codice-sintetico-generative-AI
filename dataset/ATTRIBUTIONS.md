@@ -3,9 +3,9 @@
 Generado automáticamente por `codice-scraper report --attributions`.
 No editar a mano: los cambios se pierden en la siguiente corrida.
 
-- Imágenes activas: **230**
-- Con procedencia identificada: **219**
-- Sin licencia identificada: **12**
+- Imágenes activas: **218**
+- Con procedencia identificada: **218**
+- Sin licencia identificada: **0**
 
 ## wikimedia
 
@@ -97,7 +97,6 @@ No editar a mano: los cambios se pierden en la siguiente corrida.
 - **wikimedia_382.jpg** — File:La Clere Grès Yprésis grains 0,5 cm.jpg por Arlette1 (CC BY-SA 4.0) <https://commons.wikimedia.org/wiki/File:La_Clere_Gr%C3%A8s_Ypr%C3%A9sis_grains_0,5_cm.jpg>
 - **wikimedia_384.jpg** — File:Lamprophyre dike, Birsay, Orkney.jpg por Geopersona (CC BY-SA 3.0) <https://commons.wikimedia.org/wiki/File:Lamprophyre_dike,_Birsay,_Orkney.jpg>
 - **wikimedia_403.jpg** — File:Nahaufnahme Sandstein Wernsbach.jpg por Jojoo64 (CC BY-SA 4.0) <https://commons.wikimedia.org/wiki/File:Nahaufnahme_Sandstein_Wernsbach.jpg>
-- **wikimedia_409.jpg** — File:PIA16550-MarsCuriosityRover-ShalerOutcrop-20121207.jpg por NASA/JPL-Caltech/MSSS (UNKNOWN) <https://commons.wikimedia.org/wiki/File:PIA16550-MarsCuriosityRover-ShalerOutcrop-20121207.jpg>
 - **wikimedia_414.jpg** — File:Pescar tociline.jpg por Ranko (Public domain) <https://commons.wikimedia.org/wiki/File:Pescar_tociline.jpg>
 - **wikimedia_422.jpg** — File:PotsdamSandstone Diplocraterion.jpg por Michael C. Rygel (CC BY-SA 3.0) <https://commons.wikimedia.org/wiki/File:PotsdamSandstone_Diplocraterion.jpg>
 - **wikimedia_425.jpg** — File:Raindrop impressions.jpg por Rygel, M.C. (CC BY-SA 4.0) <https://commons.wikimedia.org/wiki/File:Raindrop_impressions.jpg>
@@ -228,21 +227,3 @@ No editar a mano: los cambios se pierden en la siguiente corrida.
 - **wikimedia_991.jpg** — File:Pierre de Pontijou.JPG por Dinkum (CC0) <https://commons.wikimedia.org/wiki/File:Pierre_de_Pontijou.JPG>
 - **wm_anthropocene_coastal_dune.jpg** — File:Anthropocene coastal dune.jpg por Bramfab (CC BY-SA 4.0) <https://commons.wikimedia.org/wiki/File:Anthropocene_coastal_dune.jpg>
 - **wm_plastiglomerate_museon.jpg** — File:Plastiglomerate Museon.jpg por Aaikevanoord (CC BY-SA 4.0) <https://commons.wikimedia.org/wiki/File:Plastiglomerate_Museon.jpg>
-
-## Sin procedencia identificada
-
-Estas imágenes no pudieron emparejarse con su fuente original.
-Decidir caso por caso si entran al entrenamiento.
-
-- wikimedia_1117.jpg
-- wikimedia_1121.jpg
-- wikimedia_1122.jpg
-- wikimedia_1123.jpg
-- wikimedia_1141.jpg
-- wikimedia_1155.jpg
-- wikimedia_1156.jpg
-- wikimedia_1167.jpg
-- wikimedia_409.jpg
-- wikimedia_446.jpg
-- wikimedia_447.jpg
-- wikimedia_798.jpg

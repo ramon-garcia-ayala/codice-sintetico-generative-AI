@@ -25,8 +25,19 @@ echo "==> Directorios"
 mkdir -p "$MODELS_DIR" "$WORKSPACE/dataset" "$WORKSPACE/output" "$WORKSPACE/logs"
 
 echo "==> Dependencias del sistema"
-if ! command -v git >/dev/null; then
-    apt-get update -qq && apt-get install -y -qq git wget aria2
+# Una comprobación por herramienta, no un guard sobre `git`: los templates de
+# RunPod ya traen git, así que un `if ! command -v git` se salta la rama entera
+# y aria2c —que usa `download()` más abajo— nunca se instala. Con `set -e` eso
+# aborta en la primera descarga y deja /workspace/models vacío.
+MISSING=()
+for tool in git wget aria2c; do
+    command -v "$tool" >/dev/null || MISSING+=("$tool")
+done
+if [ ${#MISSING[@]} -gt 0 ]; then
+    # El paquete de aria2c se llama aria2; el resto coincide con el binario.
+    PKGS=("${MISSING[@]/aria2c/aria2}")
+    echo "    faltan: ${MISSING[*]} -> instalando ${PKGS[*]}"
+    apt-get update -qq && apt-get install -y -qq "${PKGS[@]}"
 fi
 
 echo "==> kohya_ss / sd-scripts"

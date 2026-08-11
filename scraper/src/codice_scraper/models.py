@@ -54,7 +54,15 @@ UNKNOWN_LICENSE = "UNKNOWN"
 
 
 class RejectReason(StrEnum):
-    """Por qué una imagen no entra al entrenamiento."""
+    """Por qué una imagen no entra al entrenamiento.
+
+    La distinción entre razones automáticas y `MANUAL` es funcional, no
+    decorativa: `restore` sólo revierte `MANUAL`, porque revertir un veredicto
+    automático a mano y que el siguiente `audit` lo vuelva a poner sería un
+    bucle sin salida. Un veredicto automático que se marque como `MANUAL`
+    quedaría al alcance de `restore` — de ahí que el ruido de catálogo tenga su
+    propia razón (`OUT_OF_SCOPE`) en vez de reutilizar `MANUAL`.
+    """
 
     TOO_SMALL = "too_small"
     STUDIO_BACKGROUND = "studio_background"
@@ -62,7 +70,27 @@ class RejectReason(StrEnum):
     DUPLICATE = "duplicate"
     EXTREME_ASPECT = "extreme_aspect"
     UNREADABLE = "unreadable"
+    LICENSE_DENIED = "license_denied"
+    OUT_OF_SCOPE = "out_of_scope"
     MANUAL = "manual"
+
+
+#: Razones que `apply_filters` recalcula desde cero en cada pasada. Todo lo que
+#: esté aquí se limpia antes de volver a evaluar, para que bajar un umbral
+#: tenga efecto en vez de dejar el veredicto viejo pegado al record.
+#:
+#: `DUPLICATE` queda fuera a propósito: lo calcula `find_duplicates` en una
+#: segunda pasada sobre el conjunto entero, no `apply_filters` sobre una imagen
+#: suelta. `MANUAL`, `LICENSE_DENIED` y `OUT_OF_SCOPE` tampoco dependen de los
+#: píxeles y sobreviven a cualquier recálculo de umbrales.
+RECOMPUTED_REJECT_REASONS: frozenset[RejectReason] = frozenset(
+    {
+        RejectReason.TOO_SMALL,
+        RejectReason.STUDIO_BACKGROUND,
+        RejectReason.BLURRY,
+        RejectReason.EXTREME_ASPECT,
+    }
+)
 
 
 class ImageRecord(BaseModel):

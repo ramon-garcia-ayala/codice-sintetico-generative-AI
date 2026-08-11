@@ -29,8 +29,9 @@ from tqdm import tqdm
 from urllib3.util.retry import Retry
 
 from .hashing import hamming, phash
+from .licenses import is_allowed
 from .manifest import Manifest
-from .models import ImageRecord
+from .models import ImageRecord, RejectReason
 
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 
@@ -318,7 +319,15 @@ def recover_provenance(
 
 
 def _apply_metadata(rec: ImageRecord, cand: dict, category: str) -> None:
-    """Vuelca la ficha de Commons sobre el record local."""
+    """Vuelca la ficha de Commons sobre el record local y aplica la licencia.
+
+    El gate de licencias tiene que estar aquí y no sólo en `pipeline.fetch`:
+    las imágenes heredadas del Drive nunca pasan por `fetch` —entran con
+    `ingest` y reciben su licencia justo en esta función—, así que sin esta
+    comprobación el camino ingest → recover → export se salta la política
+    entera y publica en `ATTRIBUTIONS.md` como verificado algo que `fetch`
+    habría bloqueado.
+    """
     info = cand["info"]
     meta = info.get("extmetadata") or {}
 
@@ -336,3 +345,24 @@ def _apply_metadata(rec: ImageRecord, cand: dict, category: str) -> None:
     rec.categories = [c.strip() for c in cats.split("|") if c.strip()] if cats else [category]
     if category not in rec.categories:
         rec.categories.append(category)
+
+    apply_license_policy(rec)
+
+
+def apply_license_policy(rec: ImageRecord) -> bool:
+    """Marca o levanta `LICENSE_DENIED` según la licencia actual del record.
+
+    Idempotente y reversible: si una corrida posterior recupera una licencia
+    mejor para la misma imagen, el descarte se retira solo. Devuelve True si la
+    licencia es admisible.
+    """
+    allowed = is_allowed(rec.license)
+    has_flag = RejectReason.LICENSE_DENIED in rec.reject_reasons
+
+    if allowed and has_flag:
+        rec.reject_reasons.remove(RejectReason.LICENSE_DENIED)
+        rec.rejected = bool(rec.reject_reasons)
+    elif not allowed and not has_flag:
+        rec.reject(RejectReason.LICENSE_DENIED)
+
+    return allowed

@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 
 from .hashing import laplacian_variance, load_thumb, phash
-from .models import ImageRecord, RejectReason
+from .models import RECOMPUTED_REJECT_REASONS, ImageRecord, RejectReason
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp"}
 
@@ -140,10 +140,17 @@ def is_studio_background(m: ImageMetrics, cfg: FilterConfig | None = None) -> bo
 def apply_filters(
     rec: ImageRecord, m: ImageMetrics, cfg: FilterConfig | None = None
 ) -> ImageRecord:
-    """Escribe las métricas en el record y marca los descartes.
+    """Escribe las métricas en el record y **recalcula** los descartes de píxel.
 
-    No borra nada: sólo pone `rejected` y acumula razones, para que el contact
-    sheet pueda mostrar lo descartado y permitir revertirlo.
+    No borra archivos: sólo marca `rejected` con sus razones, para que el
+    contact sheet muestre lo descartado y permita revertirlo.
+
+    Las razones de `RECOMPUTED_REJECT_REASONS` se limpian antes de reevaluar.
+    Sin eso, reejecutar `audit` con un umbral más bajo no tendría ningún efecto
+    visible —el veredicto viejo seguiría pegado al record— y además desharía
+    silenciosamente cualquier rescate hecho con `refilter`. Las razones que no
+    dependen de los píxeles (`MANUAL`, `LICENSE_DENIED`, `OUT_OF_SCOPE`) y el
+    `DUPLICATE` que calcula `find_duplicates` en otra pasada sobreviven intactas.
     """
     cfg = cfg or FilterConfig()
 
@@ -151,6 +158,14 @@ def apply_filters(
     rec.mode, rec.bytes = m.mode, m.bytes
     rec.phash, rec.sharpness = m.phash, m.sharpness
     rec.saturation = m.saturation
+
+    rec.reject_reasons = [
+        r for r in rec.reject_reasons if r not in RECOMPUTED_REJECT_REASONS
+    ]
+    # `panoramic` también es un veredicto derivado de las métricas: si no se
+    # reinicia, una imagen deja de ser panorámica sólo cuando alguien lo edita
+    # a mano.
+    rec.panoramic = False
 
     if m.short_side < cfg.min_short_side:
         rec.reject(RejectReason.TOO_SMALL)
@@ -168,8 +183,11 @@ def apply_filters(
         rec.panoramic = True
 
     if m.mode not in ("RGB", "L"):
-        rec.needs_review.append(f"convertir a RGB (mode={m.mode})")
+        note = f"convertir a RGB (mode={m.mode})"
+        if note not in rec.needs_review:
+            rec.needs_review.append(note)
 
+    rec.rejected = bool(rec.reject_reasons)
     return rec
 
 

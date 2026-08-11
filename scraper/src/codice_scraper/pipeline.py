@@ -8,6 +8,7 @@ comprobarse después de bajar, pero la URL y el título no.
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -19,7 +20,7 @@ from .filters import FilterConfig, apply_filters, measure
 from .hashing import sha256_file
 from .licenses import explain, is_allowed
 from .manifest import Manifest
-from .models import ImageClass, ImageRecord, UNKNOWN_LICENSE
+from .models import UNKNOWN_LICENSE, ImageClass, ImageRecord, RejectReason
 from .sources.base import Source, http_session
 
 
@@ -32,6 +33,7 @@ class FetchStats:
     skipped_license: int = 0
     downloaded: int = 0
     failed: int = 0
+    unreadable: int = 0
     rejected: int = 0
     duplicates: int = 0
     by_source: Counter = field(default_factory=Counter)
@@ -56,6 +58,7 @@ class FetchStats:
             lines += [
                 f"  Descargadas           {self.downloaded}",
                 f"  Fallidas              {self.failed}",
+                f"  Ilegibles (marcadas)  {self.unreadable}",
                 f"  Duplicadas (pHash)    {self.duplicates}",
                 f"  Descartadas al filtrar{self.rejected:6d}",
             ]
@@ -83,6 +86,36 @@ class FetchStats:
 
         lines.append("=" * 66)
         return "\n".join(lines)
+
+
+def _unique_filename(
+    rec: ImageRecord,
+    taken: set[str],
+    manifest: Manifest,
+    seen_urls: set[str],
+) -> str:
+    """Devuelve un filename libre para `rec`, desambiguando si hace falta.
+
+    Un nombre está "libre" si nadie lo usa, o si lo usa un record del manifest
+    que corresponde a esta misma imagen (misma `download_url`) — ese caso es
+    una recaptura legítima y debe reutilizar el nombre para que el `upsert`
+    actualice en lugar de duplicar.
+
+    Cuando choca de verdad se añade un sufijo derivado de la URL: determinista,
+    así que reejecutar el scraper produce el mismo nombre y la idempotencia se
+    mantiene.
+    """
+    name = rec.filename
+    existing = manifest.get(name)
+
+    if name not in taken and (existing is None or existing.download_url == rec.download_url):
+        return name
+
+    stem, dot, ext = name.rpartition(".")
+    if not dot:
+        stem, ext = name, ""
+    digest = hashlib.sha1((rec.download_url or name).encode()).hexdigest()[:8]
+    return f"{stem}_{digest}{dot}{ext}"
 
 
 def _download(
@@ -142,6 +175,7 @@ def fetch(
     known_urls = manifest.known_urls()
     known_phash = manifest.known_phash()
     seen_urls: set[str] = set()
+    taken_filenames: set[str] = set()
     candidates: list[ImageRecord] = []
 
     for source in sources:
@@ -173,6 +207,17 @@ def fetch(
                                 f"{rec.license[:34]} — {explain(rec.license)}"
                             ] += 1
                             continue
+
+                    # La deduplicación va por URL, pero el disco y el manifest
+                    # están indexados por filename. Dos URLs distintas que
+                    # produzcan el mismo nombre harían que la segunda
+                    # sobrescribiera el record de la primera y publicara su
+                    # atribución cambiada, así que el nombre se desambigua
+                    # antes de tocar nada.
+                    rec.filename = _unique_filename(
+                        rec, taken_filenames, manifest, seen_urls
+                    )
+                    taken_filenames.add(rec.filename)
 
                     seen_urls.add(rec.download_url)
                     candidates.append(rec)
@@ -208,9 +253,17 @@ def fetch(
         path = dest_dir / rec.filename
         try:
             metrics = measure(path, cfg)
-        except Exception:
-            path.unlink(missing_ok=True)
-            stats.failed += 1
+        except Exception as exc:
+            # Se marca y se conserva, como hace `audit`. Borrar el archivo y
+            # descartar el record dejaba su URL fuera de `known_urls()`, así
+            # que cada `fetch` posterior volvía a descubrirla, bajarla y
+            # borrarla — un bucle sin fin, invisible salvo por un contador
+            # anónimo de fallos.
+            rec.reject(RejectReason.UNREADABLE)
+            rec.needs_review.append(f"no se pudo leer: {type(exc).__name__}")
+            stats.unreadable += 1
+            stats.rejected += 1
+            manifest.upsert(rec)
             continue
 
         rec.sha256 = sha256_file(path)
@@ -219,8 +272,6 @@ def fetch(
         # El pHash sólo se puede comprobar tras descargar: distintas fuentes
         # sirven la misma foto bajo URLs distintas.
         if rec.phash and rec.phash in known_phash:
-            from .models import RejectReason
-
             rec.reject(RejectReason.DUPLICATE)
             stats.duplicates += 1
         elif rec.phash:

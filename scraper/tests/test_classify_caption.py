@@ -62,7 +62,10 @@ def test_classify_all_marca_el_mineral_de_coleccion(index):
     rec = _rec(categories=["Fluorite"])
     classify_all([rec], index)
     assert rec.rejected
-    assert RejectReason.MANUAL in rec.reject_reasons
+    # OUT_OF_SCOPE y no MANUAL: es un veredicto del clasificador, y `restore`
+    # sólo debe poder revertir decisiones humanas.
+    assert RejectReason.OUT_OF_SCOPE in rec.reject_reasons
+    assert RejectReason.MANUAL not in rec.reject_reasons
     assert any("mineral" in n for n in rec.needs_review)
 
 

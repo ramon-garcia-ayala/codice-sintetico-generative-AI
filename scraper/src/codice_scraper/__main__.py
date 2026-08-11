@@ -26,7 +26,7 @@ from .audit import audit_directory
 from .filters import FilterConfig, iter_images
 from .hashing import sha256_file
 from .manifest import Manifest, write_attributions
-from .models import ImageClass, ImageRecord, UNKNOWN_LICENSE
+from .models import UNKNOWN_LICENSE, ImageClass, ImageRecord, RejectReason
 
 
 def _filter_config(args: argparse.Namespace) -> FilterConfig:
@@ -247,6 +247,46 @@ def cmd_refilter(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- relicense --------------------------------------------------------
+
+
+def cmd_relicense(args: argparse.Namespace) -> int:
+    """Reaplica la política de licencias a todo el manifest.
+
+    Simétrico a `refilter`: no vuelve a consultar la red, sólo reevalúa las
+    licencias ya guardadas. Hace falta cuando la política de `licenses.py`
+    cambia, y para poner al día manifests escritos antes de que `recover`
+    aplicara el gate.
+    """
+    from .licenses import explain
+    from .recover import apply_license_policy
+
+    manifest = Manifest(paths.MANIFEST_PATH).load()
+    denied, freed = [], []
+
+    for rec in manifest.all():
+        before = RejectReason.LICENSE_DENIED in rec.reject_reasons
+        allowed = apply_license_policy(rec)
+        after = RejectReason.LICENSE_DENIED in rec.reject_reasons
+        if after and not before:
+            denied.append((rec.filename, rec.license))
+        elif before and not after:
+            freed.append(rec.filename)
+        if before != after:
+            manifest.upsert(rec)
+
+    manifest.save()
+
+    print(f"\n  Marcadas por licencia   {len(denied)}")
+    for name, lic in denied:
+        print(f"    {name:34s} {lic[:28]:28s} {explain(lic)}")
+    if freed:
+        print(f"  Liberadas               {len(freed)}: {', '.join(freed)}")
+    if denied:
+        print("\nSiguiente:  codice-scraper export")
+    return 0
+
+
 # --- classify -------------------------------------------------------------
 
 
@@ -353,38 +393,54 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 
 def cmd_reject(args: argparse.Namespace) -> int:
-    """Descarte manual tras revisión visual de la hoja de contacto."""
+    """Descarte manual tras revisión visual de la hoja de contacto.
+
+    La marca `MANUAL` se añade **siempre**, incluso si un filtro ya había
+    descartado la imagen. Saltarse ese caso dejaba la decisión humana sin
+    registrar en ninguna parte, y bastaba un `refilter` posterior —que retira
+    la razón automática— para que la imagen volviera al entrenamiento como si
+    nadie hubiera opinado.
+    """
     from .models import RejectReason
 
     manifest = Manifest(paths.MANIFEST_PATH).load()
     note = f"revisión manual: {args.reason}" if args.reason else "revisión manual"
 
-    touched, missing, already = [], [], []
+    newly, reinforced, missing, noop = [], [], [], []
     for name in args.filenames:
         rec = manifest.get(name)
         if rec is None:
             missing.append(name)
             continue
-        if rec.rejected:
-            already.append(name)
+        if RejectReason.MANUAL in rec.reject_reasons:
+            noop.append(name)
             continue
+
+        was_rejected = rec.rejected
         rec.reject(RejectReason.MANUAL)
         if note not in rec.needs_review:
             rec.needs_review.append(note)
         manifest.upsert(rec)
-        touched.append(name)
+        (reinforced if was_rejected else newly).append(name)
 
     manifest.save()
 
-    print(f"\n  Descartadas ahora     {len(touched)}")
-    for n in touched:
+    print(f"\n  Descartadas ahora     {len(newly)}")
+    for n in newly:
         print(f"    {n}")
-    if already:
-        print(f"  Ya estaban descartadas {len(already)}: {', '.join(already)}")
+    if reinforced:
+        print(
+            f"  Ya descartadas por un filtro, ahora también marcadas a mano "
+            f"{len(reinforced)}:"
+        )
+        for n in reinforced:
+            print(f"    {n}")
+    if noop:
+        print(f"  Ya estaban marcadas a mano {len(noop)}: {', '.join(noop)}")
     if missing:
         print(f"  No encontradas en el manifest {len(missing)}: {', '.join(missing)}")
 
-    if touched:
+    if newly or reinforced:
         print("\nSiguiente:  codice-scraper export")
     return 0
 
@@ -522,6 +578,11 @@ def build_parser() -> argparse.ArgumentParser:
     rf.add_argument("--min-short-side", type=int, required=True)
     rf.add_argument("--klass", help="limitar a una clase (nombre de carpeta); si se omite, todas")
     rf.set_defaults(func=cmd_refilter)
+
+    rl = sub.add_parser(
+        "relicense", help="reaplica la política de licencias sobre el manifest"
+    )
+    rl.set_defaults(func=cmd_relicense)
 
     c = sub.add_parser("classify", help="asigna clase según categorías de Commons")
     c.add_argument("--overwrite", action="store_true", help="reclasificar lo ya clasificado")

@@ -106,6 +106,14 @@ def classify_all(
             continue
 
         klass = classify(rec, index)
+        # El caption lleva el nombre de la clase incrustado
+        # (`CLASS_CAPTION_HINT`), así que sobrevivir a un cambio de clase lo
+        # convierte en una descripción falsa. `caption_all` se salta los
+        # records que ya tienen texto, de modo que invalidarlo aquí es lo que
+        # hace que un `classify --overwrite` seguido de `caption` regenere lo
+        # que toca sin exigir `--overwrite` también en el segundo comando.
+        if klass is not rec.klass:
+            rec.caption = None
         rec.klass = klass
         counts[klass.value] += 1
 
@@ -121,7 +129,11 @@ def classify_all(
             # desconocidas significa que no sabemos qué es, no que sea mineral
             # de colección. Confundir ambos casos descartaría material válido.
             if "legacy_noise" in groups and groups <= {"legacy_noise", None}:
-                rec.reject(RejectReason.MANUAL)
+                # `OUT_OF_SCOPE`, no `MANUAL`: es un veredicto del clasificador,
+                # y `restore` sólo debe poder revertir decisiones humanas. Con
+                # `MANUAL` aquí, un `restore` sobre un lote de nombres
+                # reintroduciría ruido de catálogo que nadie decidió admitir.
+                rec.reject(RejectReason.OUT_OF_SCOPE)
                 if "mineral de colección, fuera del concepto" not in rec.needs_review:
                     rec.needs_review.append("mineral de colección, fuera del concepto")
 

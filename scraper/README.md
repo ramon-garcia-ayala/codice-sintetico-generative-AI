@@ -47,6 +47,16 @@ codice-scraper export                    # árbol N_clase/ para kohya
 codice-scraper report --attributions     # estado + ATTRIBUTIONS.md
 ```
 
+Tres comandos más, para cuando cambian las reglas en vez de los datos. Ninguno
+toca la red: reevalúan lo que ya está medido en el manifest.
+
+```bash
+codice-scraper reject <archivos> --reason "..."   # descarte manual tras revisar
+codice-scraper restore <archivos>                 # revierte un descarte manual
+codice-scraper refilter --min-short-side 640 [--klass X]   # reaplica el umbral
+codice-scraper relicense                          # reaplica la política de licencias
+```
+
 Todo es idempotente: repetir un comando no vuelve a descargar ni duplica
 entradas del manifest.
 
@@ -129,15 +139,48 @@ se decide con la imagen delante en la hoja de contacto.
 
 ## Licencias
 
-`licenses.py` centraliza la política y el pipeline la aplica a todas las
-fuentes por igual. Se excluyen **NC** (el proyecto se expone en una institución
-y puede tener difusión comercial) y **ND** (todo el pipeline es transformación,
-que es justo lo que ND prohíbe).
+`licenses.py` centraliza la política. Se excluyen **NC** (el proyecto se expone
+en una institución y puede tener difusión comercial) y **ND** (todo el pipeline
+es transformación, que es justo lo que ND prohíbe).
 
-El orden de comprobación importa: `"cc by" in "cc by-nc-nd"` es verdadero, así
-que hay que excluir las cláusulas prohibidas **antes** de buscar las permitidas.
-Un filtro por inclusión ingenuo deja pasar precisamente lo que quiere bloquear
-— pasó, y por eso existe `test_licenses.py`.
+Se aplica en **tres** puntos, no en uno:
+
+- `fetch`, al descubrir — evita descargar lo que no se va a poder usar.
+- `recover`, al recuperar la ficha de Commons — las imágenes heredadas del
+  Drive nunca pasan por `fetch`, así que sin este punto todo el camino
+  `ingest → recover → export` se saltaba la política entera.
+- `export`, como última barrera — es donde una imagen deja de ser candidata y
+  pasa a ser material publicado, así que ninguna ruta futura hacia el manifest
+  puede colar algo sin licencia en `dataset/train/`.
+
+Lo que no pasa el filtro se marca `license_denied` y queda visible en `report`
+y en la hoja de contacto, en vez de desaparecer.
+
+Dos detalles que costaron un fallo cada uno:
+
+- El orden de comprobación importa: `"cc by" in "cc by-nc-nd"` es verdadero, así
+  que hay que excluir las cláusulas prohibidas **antes** de buscar las
+  permitidas. Un filtro por inclusión ingenuo deja pasar precisamente lo que
+  quiere bloquear.
+- Aplicarla en un solo punto no basta cuando hay más de una forma de entrar al
+  manifest.
+
+## Razones de descarte y quién puede revertirlas
+
+`restore` sólo revierte `manual`. Esa distinción es funcional: revertir a mano
+un veredicto automático que el siguiente `audit` volvería a poner sería un bucle
+sin salida. Por eso el ruido de catálogo que detecta `classify` se marca
+`out_of_scope` y no `manual` — si usara `manual`, un `restore` sobre un lote de
+nombres reintroduciría material que nadie decidió admitir.
+
+En la dirección contraria, `reject` añade la marca **siempre**, incluso sobre
+una imagen que un filtro ya había descartado. Si no lo hiciera, un `refilter`
+posterior —que retira la razón automática— devolvería al entrenamiento algo que
+alguien rechazó explícitamente, sin rastro en ninguna parte.
+
+`apply_filters` recalcula desde cero las razones que dependen de los píxeles
+(`RECOMPUTED_REJECT_REASONS`) y respeta el resto. Sin eso, bajar un umbral no
+tendría ningún efecto visible y además desharía los rescates de `refilter`.
 
 ## Filtrado
 

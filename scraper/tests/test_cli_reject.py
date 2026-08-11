@@ -34,7 +34,15 @@ def test_reject_marca_una_activa(tmp_path, monkeypatch):
     assert any("estudio" in n for n in rec.needs_review)
 
 
-def test_reject_es_idempotente_sobre_ya_descartadas(tmp_path, monkeypatch, capsys):
+def test_reject_marca_tambien_sobre_una_ya_descartada_por_filtro(
+    tmp_path, monkeypatch, capsys
+):
+    """La decisión humana se registra siempre, aunque un filtro se adelantara.
+
+    Antes se salteaba este caso, y entonces un `refilter` que retirase la razón
+    automática devolvía al entrenamiento una imagen que alguien había rechazado
+    explícitamente, sin rastro en el manifest.
+    """
     manifest_path = tmp_path / "m.jsonl"
     ya_mala = ImageRecord(filename="a", source="wikimedia")
     ya_mala.reject(RejectReason.STUDIO_BACKGROUND)
@@ -44,12 +52,11 @@ def test_reject_es_idempotente_sobre_ya_descartadas(tmp_path, monkeypatch, capsy
     monkeypatch.setattr("codice_scraper.paths.MANIFEST_PATH", manifest_path)
 
     cmd_reject(build_parser().parse_args(["reject", "a"]))
-    out = capsys.readouterr().out
-    assert "Ya estaban descartadas" in out
+    assert "ahora también marcadas a mano" in capsys.readouterr().out
 
     rec = Manifest(manifest_path).load().get("a")
-    # No se le añade MANUAL encima de una razón que ya existía.
-    assert rec.reject_reasons == [RejectReason.STUDIO_BACKGROUND]
+    assert RejectReason.STUDIO_BACKGROUND in rec.reject_reasons
+    assert RejectReason.MANUAL in rec.reject_reasons
 
 
 def test_reject_reporta_lo_que_no_existe(tmp_path, monkeypatch, capsys):

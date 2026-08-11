@@ -25,8 +25,15 @@ def source(tmp_path):
     return src
 
 
-def _rec(name, klass, caption="codice_geo, sedimentary strata") -> ImageRecord:
-    return ImageRecord(filename=name, source="t", klass=klass, caption=caption)
+def _rec(
+    name, klass, caption="codice_geo, sedimentary strata", license="CC BY-SA 4.0"
+) -> ImageRecord:
+    # `license` explícita: el export aplica la política como última barrera
+    # antes del entrenamiento, así que un record con la licencia por defecto
+    # (UNKNOWN) se omite y no llegaría a ejercitar lo que estos tests miden.
+    return ImageRecord(
+        filename=name, source="t", klass=klass, caption=caption, license=license
+    )
 
 
 def test_crea_una_carpeta_por_clase_con_sus_repeats(source, tmp_path):

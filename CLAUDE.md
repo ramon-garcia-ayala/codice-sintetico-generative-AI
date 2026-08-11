@@ -41,6 +41,7 @@ codice-scraper caption [--overwrite]     # build kohya captions
 codice-scraper reject <filenames...> [--reason ...]   # manual override after visual review
 codice-scraper restore <filenames...>    # undo a manual reject (not an automatic filter reject)
 codice-scraper refilter --min-short-side N [--klass X]   # re-apply resolution threshold on stored metrics, no re-download
+codice-scraper relicense                 # re-apply the license policy on stored metadata, no re-download
 codice-scraper sheet [--klass X] [--only-rejected]       # HTML contact sheet for visual review
 codice-scraper export                    # write the kohya training tree
 codice-scraper report [--attributions]   # manifest summary, optionally write ATTRIBUTIONS.md
@@ -79,14 +80,42 @@ and split into per-figure `ImageRecord`s via `zip_url::member_name` encoded into
 Adding a source means implementing `search()` (and `download()` only if needed) in
 `sources/<name>.py` and registering it in `sources/__init__.py`. Nothing else changes.
 
-### License policy lives in one place
+### License policy: one definition, three enforcement points
 
-`licenses.py` is the only place that decides if a license string is trainable. It excludes NC (the
-work is publicly exhibited and could see commercial reach) and ND (the whole pipeline transforms the
-images). **Denied clauses must be checked before allowed markers**: `"cc by" in "cc by-nc-nd"` is
-true, so checking "contains cc by" first silently admits NC/ND licenses. `pipeline.fetch()` is the
-only caller that should gate on this — a source-local copy of the same logic has already drifted out
-of sync once (see `europepmc.py` git history / `test_licenses.py`).
+`licenses.py` is the only place that *decides* whether a license string is trainable. It excludes NC
+(the work is publicly exhibited and could see commercial reach) and ND (the whole pipeline transforms
+the images). **Denied clauses must be checked before allowed markers**: `"cc by" in "cc by-nc-nd"` is
+true, so checking "contains cc by" first silently admits NC/ND licenses. Never re-implement this
+check inside a source — a source-local copy has already drifted out of sync once.
+
+It is *enforced* at three points, and all three are load-bearing:
+
+- `pipeline.fetch()` — at discovery, so unusable material is never downloaded.
+- `recover._apply_metadata()` via `apply_license_policy()` — the legacy Drive images arrive through
+  `ingest`, never through `fetch`, and get their license here. Without this the whole
+  `ingest → recover → export` path bypassed the policy and published unvetted images in
+  ATTRIBUTIONS.md as verified.
+- `export_kohya()` — the boundary where an image stops being a candidate and becomes published
+  material, so no future path into the manifest can leak into `dataset/train/`.
+
+Rejected licenses are marked `license_denied` (visible in `report` and the contact sheet), not
+dropped. `codice-scraper relicense` re-applies the policy to an existing manifest without hitting
+the network — use it after changing `licenses.py`.
+
+### Who may revert a rejection
+
+`restore` reverts only `RejectReason.MANUAL`. This is functional, not cosmetic: hand-reverting an
+automatic verdict that the next `audit` would re-apply is a loop with no exit. So automatic verdicts
+must never be stamped `MANUAL` — `classify`'s catalogue-noise rejection uses `OUT_OF_SCOPE`
+precisely so a batch `restore` cannot silently readmit it.
+
+Symmetrically, `reject` always records `MANUAL`, even on an image a filter already rejected.
+Skipping that case left the human decision unrecorded, and a later `refilter` (which lifts the
+automatic reason) would return it to training with no trace.
+
+`apply_filters` recomputes the pixel-derived reasons in `RECOMPUTED_REJECT_REASONS` from scratch on
+every pass and preserves everything else. Without that, lowering a threshold is a silent no-op and
+`refilter` rescues get undone by the next `audit`.
 
 ### Four training classes, encoded as kohya repeat-count folders
 

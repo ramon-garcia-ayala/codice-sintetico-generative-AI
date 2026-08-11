@@ -20,6 +20,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from ..licenses import is_allowed
 from ..models import CLASS_REPEATS, TRIGGER, ImageClass, ImageRecord
 
 
@@ -31,6 +32,7 @@ class ExportStats:
     per_class: dict[str, int] = field(default_factory=dict)
     converted: int = 0
     skipped_no_caption: list[str] = field(default_factory=list)
+    skipped_license: list[str] = field(default_factory=list)
     missing_source: list[str] = field(default_factory=list)
 
     @property
@@ -71,6 +73,11 @@ class ExportStats:
         ]
         if self.converted:
             lines.append(f"  Convertidas a RGB     {self.converted}")
+        if self.skipped_license:
+            lines.append(
+                f"  LICENCIA NO APTA (omitidas) {len(self.skipped_license)}"
+                "   <-- revisar procedencia"
+            )
         if self.skipped_no_caption:
             lines.append(
                 f"  SIN CAPTION (omitidas) {len(self.skipped_no_caption)}"
@@ -124,6 +131,15 @@ def export_kohya(
 
     for rec in records:
         if rec.rejected or rec.klass is ImageClass.UNCLASSIFIED:
+            continue
+        # Última barrera antes del entrenamiento. `recover` y `fetch` ya
+        # aplican la política, pero este es el punto donde una imagen deja de
+        # ser un candidato y pasa a ser material publicado: comprobarlo aquí
+        # significa que ninguna ruta futura hacia el manifest —una fuente
+        # nueva, un `restore` desafortunado, una edición a mano— puede colar
+        # algo sin licencia en `dataset/train/`.
+        if not is_allowed(rec.license):
+            stats.skipped_license.append(rec.filename)
             continue
         if not rec.caption:
             stats.skipped_no_caption.append(rec.filename)
