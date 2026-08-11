@@ -1,0 +1,44 @@
+# Notebooks del curso IAAC MaCDA GenAI — material de referencia de terceros.
+# Se conservan en disco para consultarlos, pero fuera del repo: son ~217 MB
+# (sobre todo salidas embebidas y PNGs de ejemplo) y no forman parte del
+# pipeline de codice_geo, que entrena vía kohya_ss.
+Image_workflows/
+LoRA_train_workflows/
+
+# Dataset de imágenes — nunca se versiona (1.2 GB+), solo su procedencia
+dataset/**
+!dataset/manifest.jsonl
+!dataset/ATTRIBUTIONS.md
+!dataset/**/.gitkeep
+
+# Reportes generados
+reports/
+*.contactsheet.html
+
+# Credenciales de fuentes (Flickr, Mindat)
+scraper/config/secrets.yaml
+.env
+
+# Pesos de modelos
+*.safetensors
+*.ckpt
+*.pt
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Windows / Drive
+desktop.ini
+Thumbs.db
+.DS_Store

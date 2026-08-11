@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codice-scraper"
+version = "0.1.0"
+description = "Dataset geológico para el LoRA de Códice Sintético: auditoría, rescate de procedencia y scraping multi-fuente"
+requires-python = ">=3.11"
+
+# Deliberadamente mínimo: pHash y varianza del Laplaciano están implementados
+# en numpy puro (ver hashing.py) para no depender de imagehash ni de OpenCV.
+dependencies = [
+    "pillow>=10",
+    "numpy>=1.24",
+    "requests>=2.31",
+    "pydantic>=2.5",
+    "pyyaml>=6",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+codice-scraper = "codice_scraper.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

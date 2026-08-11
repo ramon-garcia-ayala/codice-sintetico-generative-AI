@@ -1,0 +1,86 @@
+# Configuración de entrenamiento del LoRA `codice_geo` para SDXL.
+#
+# Los valores vienen del brief del proyecto (paso 5): network dim 32,
+# alpha 16, learning rate 1e-4 en la UNet y 5e-5 en el text encoder,
+# 10-15 épocas, 1024x1024.
+#
+# Referencia de tiempo: ~350 imágenes con los repeats de `CLASS_REPEATS` dan
+# unos 3.500 pasos por época; en una RTX 4090 eso son 40-60 minutos.
+
+[model_arguments]
+pretrained_model_name_or_path = "/workspace/models/sd_xl_base_1.0.safetensors"
+# SDXL produce NaN con su VAE original en fp16; este fork lo corrige.
+vae = "/workspace/models/sdxl_vae_fp16_fix.safetensors"
+sdxl = true
+
+[dataset_arguments]
+train_data_dir = "/workspace/dataset/train"
+resolution = "1024,1024"
+# Bucketing: agrupa por relación de aspecto en vez de recortar al centro.
+# Importante aquí — recortar un afloramiento estratificado al centro se come
+# justo la estratificación, que es lo que se quiere aprender.
+enable_bucket = true
+bucket_no_upscale = true
+min_bucket_reso = 640
+max_bucket_reso = 2048
+caption_extension = ".txt"
+# Sin volteo horizontal: la estratigrafía tiene una orientación real y
+# duplicar el dataset con capas invertidas enseñaría una geología imposible.
+flip_aug = false
+color_aug = false
+shuffle_caption = true
+# El trigger va primero en el caption y debe quedar fijo al barajar el resto.
+keep_tokens = 1
+
+[training_arguments]
+output_dir = "/workspace/output"
+output_name = "codice_geo_v1"
+save_model_as = "safetensors"
+save_precision = "fp16"
+# Cada 2 épocas: permite elegir el punto antes del sobreajuste sin llenar el
+# volumen de checkpoints.
+save_every_n_epochs = 2
+
+max_train_epochs = 12
+train_batch_size = 1
+gradient_accumulation_steps = 4
+gradient_checkpointing = true
+mixed_precision = "fp16"
+xformers = true
+cache_latents = true
+cache_latents_to_disk = true
+persistent_data_loader_workers = true
+max_data_loader_n_workers = 4
+seed = 42
+
+optimizer_type = "AdamW8bit"
+learning_rate = 1e-4
+unet_lr = 1e-4
+text_encoder_lr = 5e-5
+lr_scheduler = "cosine_with_restarts"
+lr_scheduler_num_cycles = 3
+lr_warmup_steps = 100
+max_grad_norm = 1.0
+
+# Pondera la pérdida por relación señal-ruido. Con texturas de alta frecuencia
+# como la roca acelera bastante la convergencia. 5.0 es el valor que ya usa
+# `03_SDXL_LoRA_Train.ipynb` en el repo.
+min_snr_gamma = 5.0
+
+[network_arguments]
+network_module = "networks.lora"
+network_dim = 32
+network_alpha = 16
+# Entrenar también el text encoder: sin esto el trigger `codice_geo` queda
+# débil y hay que subir mucho el peso del LoRA al generar.
+network_train_unet_only = false
+
+[logging_arguments]
+logging_dir = "/workspace/logs"
+log_prefix = "codice_geo"
+
+[sample_arguments]
+# Muestras periódicas para ver la deriva sin bajarse los checkpoints.
+sample_every_n_epochs = 2
+sample_sampler = "dpm_2m"
+sample_prompts = "/workspace/dataset/sample_prompts.txt"

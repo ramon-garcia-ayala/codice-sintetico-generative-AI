@@ -1,0 +1,96 @@
+# Categorías y términos de búsqueda por clase.
+#
+# `recover` usa el bloque `wikimedia_categories` para reconstruir la procedencia
+# de las 282 imágenes heredadas: barre las mismas categorías que el scrape
+# original y empareja por pHash. Cuanto más amplio el barrido, más imágenes
+# recuperan su licencia, a costa de tiempo de red.
+#
+# El set incluye categorías de mineral de colección (`Minerals`, `Fluorite`)
+# aunque ese material se descarta del entrenamiento: el scrape original sí las
+# tomó — de ahí la fluorita en vitrina — y para atribuir hay que encontrarlas.
+
+# Conteo de archivos directos medido en Commons (2026-08-10). Las categorías
+# marcadas son las que sostienen la clase `estratos`; entre las seis primeras
+# ya hay ~1.500 archivos, de sobra para las 300-400 que pide el brief.
+#
+# Nota: Commons anida mucho. `Sedimentary rocks` declara 80 subcategorías y
+# `Limestone` 65, y `categorymembers` sólo devuelve miembros directos. Ahí hay
+# margen de crecimiento si hiciera falta más volumen.
+#
+# `Conglomerate (geology)` se quitó: no existe en Commons (se comprobó).
+wikimedia_categories:
+  estratos:
+    - Limestone            # 450 archivos
+    - Sandstone            # 396
+    - Sedimentary rocks    # 237
+    - Shale                # 214
+    - Breccia              # 146
+    - Stratigraphy         #  56
+    - Siltstone            #  53
+    - Mudstone             #  36
+    - Geological strata
+    - Strata
+    - Outcrops
+    - Sedimentary structures
+    - Cross-bedding
+    - Bedding planes
+    - Rock formations
+    - Geological folds
+    - Unconformities
+    - Badlands
+    - Road cuts
+    - Quarries
+    - Turbidites
+    - Varves
+    - Flysch
+    - Cliffs
+    - Canyon walls
+
+  # Medido: `Category:Plastiglomerate` devuelve 0 archivos en Commons. La clase
+  # se surte casi entera de Europe PMC (ver `search_terms`).
+  #
+  # `Marine debris` y `Plastic pollution` se probaron y se descartaron: aportan
+  # ~120 fotos de botellas y redes en la playa, plástico suelto sin matriz
+  # mineral. No son plastiglomerado, y al ser la clase escasa la habrían
+  # contaminado más que ninguna otra.
+  plastiglomerado:
+    - Plastiglomerate
+
+  proxy:
+    - Slag
+    - Slag glass
+    - Volcanic breccia
+    - Ignimbrite
+    - Agglomerate (geology)
+    - Clinker (waste)
+    - Fulgurites
+
+  # Barridas sólo para recuperar atribución de lo ya descargado.
+  legacy_noise:
+    - Minerals
+    - Fluorite
+    - Mineral specimens
+    - Quartz
+    - Calcite
+    - Rocks
+
+# Términos de texto libre, para las fuentes que buscan por palabra clave
+# (Flickr, Europe PMC, USGS) en vez de por categoría.
+search_terms:
+  estratos:
+    - sedimentary strata outcrop
+    - stratified rock layers
+    - laminated sandstone
+    - geological cross section rock
+    - bedded limestone cliff
+  plastiglomerado:
+    - plastiglomerate
+    - plastic conglomerate beach
+    - pyroplastic rock
+    - anthropocene plastic sediment
+    - Kamilo Beach plastic
+  proxy:
+    - industrial slag texture
+    - fused waste rock
+    - volcanic breccia inclusions
+    - clinker fused material
