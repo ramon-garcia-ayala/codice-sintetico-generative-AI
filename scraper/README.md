@@ -33,6 +33,10 @@ Sólo necesita `pillow`, `numpy`, `requests`, `pydantic`, `pyyaml` y `tqdm`.
 El pHash y la varianza del laplaciano están implementados en numpy puro
 (`hashing.py`) para no arrastrar `imagehash` ni OpenCV.
 
+`codice-scraper synthesize` necesita además `torch`/`diffusers`/`accelerate`
+y una GPU CUDA local — es el único comando que los usa, así que van en un
+extra aparte: `pip install -e .[synth]`.
+
 ## Flujo completo
 
 ```bash
@@ -85,7 +89,7 @@ Lo que no se empareja queda como `license: UNKNOWN` en el manifest y aparece en
 | `01_real_estratos` | 10 | Estratos, roca sedimentaria, afloramientos |
 | `02_real_plastiglomerado` | 15 | Plastiglomerado real documentado |
 | `03_proxy_materiales` | 8 | Escoria, pyroplastics, brechas con inclusiones |
-| `04_synth_plastiglomerado` | 5 | Variaciones SDXL sobre las reales |
+| `04_synth_plastiglomerado` | 5 | Variaciones SDXL + IP-Adapter sobre las 2 reales |
 
 El prefijo numérico son las repeticiones por época de kohya. Es lo que equilibra
 clases de tamaños muy distintos sin duplicar archivos: hay cientos de estratos y
@@ -93,6 +97,61 @@ sólo decenas de plastiglomerados reales.
 
 Las sintéticas llevan el token `codice_synth` además del trigger, para poder
 medir su efecto y retirarlas del prompt sin reentrenar.
+
+## `synthesize` — variaciones de plastiglomerado
+
+```bash
+codice-scraper synthesize --count 100
+```
+
+SDXL + IP-Adapter local (`h94/IP-Adapter`, `ip-adapter_sdxl.bin`), condicionado
+sobre las 2 imágenes reales de `02_real_plastiglomerado`. Reimplementa
+`Image_workflows/04_SDXL_IP.ipynb` fuera de Colab: ese notebook depende de
+`google.colab.drive`/`google.colab.userdata`, así que no corre tal cual en
+local. Necesita una GPU CUDA (probado en una RTX 5060 Ti, 16 GB) y el extra
+`synth`.
+
+**La escala del IP-Adapter no es la del notebook (0.6).** A esa escala, sobre
+las 2 referencias reales de este proyecto, el modelo no transfería sólo el
+estilo del material: reproducía la composición y el *contexto* casi al pixel,
+incluyendo la vitrina de museo completa (vidrio, pared, pedestal) de una de
+las dos referencias. El default aquí es **0.35** — con eso el prompt (que
+especifica playa/duna/matriz volcánica, nunca museo) vuelve a pesar sobre la
+composición. La referencia de vitrina además se usa recortada
+(`synth_refs/wm_plastiglomerate_museon_crop.jpg`, sin pared ni pedestal), no
+la original completa.
+
+Cada síntesis queda en el manifest con licencia
+`"CC BY-SA 4.0 (síntesis derivada, no descargada de Commons)"` — no es una
+descarga de Commons, es una obra derivada de una que sí lo es, y se declara
+así para que `ATTRIBUTIONS.md` deje trazable de qué imagen real salió cada
+sintética.
+
+### Reconstruir `synth_refs/`
+
+El directorio de referencias no se versiona: son copias y recortes de imágenes
+que ya están en `dataset/`, y duplicarlas contradiría la regla de no versionar
+imágenes. Se reconstruye desde el árbol exportado:
+
+```bash
+cd scraper && mkdir -p synth_refs
+cp ../dataset/train/15_02_real_plastiglomerado/wm_anthropocene_coastal_dune.jpg synth_refs/
+
+python -c "
+from PIL import Image
+img = Image.open('../dataset/train/15_02_real_plastiglomerado/wm_plastiglomerate_museon.jpg')
+w, h = img.size          # 3000 x 2250
+# Recorte que deja fuera pared, pedestal y reflejo de la vitrina, conservando
+# sólo el espécimen. Sin él, el IP-Adapter transfiere el museo entero.
+img.crop((int(w*0.048), int(h*0.18), int(w*0.903), int(h*0.564))) \
+   .save('synth_refs/wm_plastiglomerate_museon_crop.jpg', quality=95)
+"
+```
+
+Los nombres conservan el prefijo `wm_` a propósito: `synthesize` los escribe en
+`ImageRecord.attribution` de cada sintética, así que un nombre genérico
+(`museon_crop.jpg`) rompería la trazabilidad hasta el archivo original de
+Commons.
 
 ## Fuentes
 

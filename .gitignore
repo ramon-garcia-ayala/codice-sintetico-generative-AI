@@ -11,6 +11,12 @@ dataset/**
 !dataset/ATTRIBUTIONS.md
 !dataset/**/.gitkeep
 
+# Referencias de `codice-scraper synthesize`. Son copias/recortes de imágenes
+# que ya viven en dataset/, así que versionarlas duplicaría bytes que la regla
+# de arriba excluye a propósito. El recorte es reproducible: ver
+# "synthesize — variaciones de plastiglomerado" en scraper/README.md.
+scraper/synth_refs/
+
 # Reportes generados
 reports/
 *.contactsheet.html

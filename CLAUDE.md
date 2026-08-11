@@ -42,6 +42,7 @@ codice-scraper reject <filenames...> [--reason ...]   # manual override after vi
 codice-scraper restore <filenames...>    # undo a manual reject (not an automatic filter reject)
 codice-scraper refilter --min-short-side N [--klass X]   # re-apply resolution threshold on stored metrics, no re-download
 codice-scraper relicense                 # re-apply the license policy on stored metadata, no re-download
+codice-scraper synthesize --count 100    # SDXL + IP-Adapter variations, needs a local CUDA GPU + pip install -e .[synth]
 codice-scraper sheet [--klass X] [--only-rejected]       # HTML contact sheet for visual review
 codice-scraper export                    # write the kohya training tree
 codice-scraper report [--attributions]   # manifest summary, optionally write ATTRIBUTIONS.md
@@ -127,10 +128,21 @@ prefix (`10_01_real_estratos`, `15_02_real_plastiglomerado`, `8_03_proxy_materia
 tree; it also emits `captions_SDXL.csv` for compatibility with
 `LoRA_train_workflows/01_SDXL/02_SDXL_LoRA_Captions_Check.ipynb`.
 
-`classify.py` assigns a class from the Wikimedia categories `recover`/`fetch` attached to a record
-(`config/queries.yaml` maps category → class group); it deliberately leaves a record `UNCLASSIFIED`
-rather than guess when there's no category signal, since guessing under an already-unknown license is
-compounding uncertainty no one can audit later.
+`classify.py` assigns a class from the categories `recover`/`fetch` attached to a record.
+`load_group_index()` indexes **both** `wikimedia_categories` and `search_terms` from
+`config/queries.yaml` — a record discovered via free-text search (Europe PMC, or Wikimedia's
+text-search path) carries the search term itself in `categories` (`record_from_page` /
+`recover._apply_metadata` append it), so skipping `search_terms` in the index makes `classify
+--overwrite` blank out any record whose class came from a free-text match instead of a curated
+Commons category. This happened for real: it silently reclassified one of only two real
+plastiglomerate images to `UNCLASSIFIED` and wiped its caption. `classify()` deliberately leaves a
+record `UNCLASSIFIED` rather than guess when there's no category *or* search-term signal — guessing
+under an already-unknown license is compounding uncertainty no one can audit later.
+
+**`--overwrite` re-derives class for every record it touches**, including ones a `fetch --klass X`
+call already tagged correctly. It's the right tool for fixing a genuine mis-mapping (the
+`legacy_noise` → `OUT_OF_SCOPE` case), but re-running it is not a no-op safety net — verify the
+resulting class counts (`codice-scraper report`) match expectations before moving on.
 
 ### Filtering: pixel heuristics catch what they catch, nothing more
 
@@ -139,11 +151,35 @@ compounding uncertainty no one can audit later.
 detection — all in `hashing.py`'s pure-numpy pHash/Laplacian, no `imagehash` or OpenCV dependency.
 The studio-background check works by looking for a uniform, extreme (near-black or near-white)
 perimeter border; it does **not** catch a specimen photographed close enough to fill the frame (no
-clean border to measure) — those need the `needs_review` text-based flag in `classify.py`
-(descriptions containing "specimen") plus a human decision in the contact sheet, not a stricter pixel
-rule. When adjusting a threshold, `codice-scraper audit --path dataset/_incoming` should reproduce
-the same counts documented in `scraper/tests/` (`test_filters.py`) — those numbers are the
-regression test.
+clean border to measure), nor a museum vitrine shot whose background is a busy wall/glass-reflection
+rather than a uniform one. Both need the `needs_review` text-based flags in `classify.py`
+(`_flag_studio_language`: "specimen" in the description, "museum"/"博物館"/etc. in the filename or
+title) plus a human decision in the contact sheet, not a stricter pixel rule. When adjusting a
+threshold, `codice-scraper audit --path dataset/_incoming` should reproduce the same counts
+documented in `scraper/tests/` (`test_filters.py`) — those numbers are the regression test.
+
+### Synthetic plastiglomerate: `synthesize.py`
+
+Real plastiglomerate photography is the scarce class — only 2 verified real images survived curation
+(see `scraper/README.md`). `codice-scraper synthesize` generates variations locally with SDXL +
+IP-Adapter (`h94/IP-Adapter`), reimplementing `Image_workflows/04_SDXL_IP.ipynb` outside Colab (that
+notebook imports `google.colab.drive`/`userdata` directly, so it can't run as-is anywhere else) —
+needs a local CUDA GPU and `pip install -e .[synth]` (torch/diffusers/accelerate are not base
+dependencies, imported lazily only inside this module).
+
+**IP-Adapter scale is 0.35, not the notebook's 0.6.** At 0.6, conditioned on this project's 2 real
+references, the model reproduced composition *and context* almost verbatim — including one
+reference's museum vitrine (glass, wall, pedestal) in full — rather than transferring material style.
+At 0.35 the text prompt (which always specifies beach/dune/volcanic contexts, never museum) regains
+real influence over composition. The vitrine reference is also used pre-cropped
+(`scraper/synth_refs/wm_plastiglomerate_museon_crop.jpg`) to reduce how much museum context is even
+available to condition on. Verify any new reference image or scale change by generating a handful and
+inspecting them before committing to a full batch — this is exactly the kind of failure a total-count
+check can't catch, only looking at the pixels can.
+
+Each synthetic record's `license` field reads `"CC BY-SA 4.0 (síntesis derivada, no descargada de
+Commons)"` rather than a plain Commons license string — it's a derivative work of a CC BY-SA image,
+not a Commons download, and `ATTRIBUTIONS.md` needs that distinction to stay honest about provenance.
 
 ### Why kohya, not the notebooks
 

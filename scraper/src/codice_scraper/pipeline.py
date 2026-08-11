@@ -151,8 +151,19 @@ def _download(
         tmp.replace(path)
         return rec, None
     except Exception as exc:
-        path.with_suffix(path.suffix + ".part").unlink(missing_ok=True)
-        return rec, f"{type(exc).__name__}: {str(exc)[:80]}"
+        error = f"{type(exc).__name__}: {str(exc)[:80]}"
+        try:
+            path.with_suffix(path.suffix + ".part").unlink(missing_ok=True)
+        except OSError:
+            # En Windows un archivo recién escrito puede quedar bloqueado un
+            # instante por el antivirus u otro proceso indexando la carpeta.
+            # Si el borrado falla no debe perderse el motivo real del fallo
+            # de descarga —ni, sobre todo, tumbar el `ThreadPoolExecutor`
+            # entero y con él las descargas ya completadas de este lote: eso
+            # es justo lo que pasó la primera vez que corrió este código
+            # contra 555 candidatas reales.
+            pass
+        return rec, error
 
 
 def fetch(
@@ -236,11 +247,23 @@ def fetch(
     print(f"\nDescargando {len(candidates)} imágenes…")
     results: list[ImageRecord] = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [
-            pool.submit(_download, rec, dest_dir, sources_by_name) for rec in candidates
-        ]
-        for fut in tqdm(futures, desc="  bajando", unit="img"):
-            rec, err = fut.result()
+        future_to_rec = {
+            pool.submit(_download, rec, dest_dir, sources_by_name): rec for rec in candidates
+        }
+        for fut in tqdm(future_to_rec, desc="  bajando", unit="img"):
+            try:
+                rec, err = fut.result()
+            except Exception as exc:
+                # `_download` está pensada para no dejar escapar excepciones
+                # —siempre devuelve (rec, error)—, pero si algo se le escapa
+                # de todos modos, un solo fallo imprevisto no debe tirar las
+                # descargas ya completadas del resto del lote. Ya pasó una
+                # vez: un `PermissionError` de Windows durante la limpieza de
+                # un `.part` tumbó el `ThreadPoolExecutor` entero y con él las
+                # ~140 descargas que ya llevaba, sin que nada quedara en el
+                # manifest.
+                rec = future_to_rec[fut]
+                err = f"{type(exc).__name__}: {str(exc)[:80]}"
             if err:
                 stats.failed += 1
                 stats.download_errors[f"{rec.source}: {err.split(':')[0]}"] += 1

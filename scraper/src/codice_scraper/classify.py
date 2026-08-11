@@ -28,36 +28,68 @@ GROUP_TO_CLASS = {
     "proxy": ImageClass.PROXY,
 }
 
-#: Señal débil de fotografía de espécimen/estudio en la descripción de Commons.
-#: Se comprobó sobre el dataset real: 27 imágenes activas contienen "specimen",
-#: pero no todas son contaminación — hay cortes pulidos de roca (wackestone,
-#: travertino) que sí muestran textura sedimentaria genuina junto a series de
-#: minerales de colección mal categorizados (ej. una serie de 15 fotos de
-#: asfaltita etiquetada "Sedimentary rocks" en Commons, con fondo de estudio
-#: que el filtro de píxeles no detecta porque el espécimen llena el encuadre).
-#: Por eso esto sólo marca `needs_review`, nunca descarta: la decisión final
-#: es visual, en la hoja de contacto.
+#: Señales débiles de fotografía de espécimen/vitrina en el texto de Commons.
+#: Se comprobaron sobre el dataset real, en dos rondas:
+#:
+#: - "specimen" en la descripción: 27 imágenes activas de estratos, no todas
+#:   contaminación — hay cortes pulidos de roca (wackestone, travertino) que sí
+#:   muestran textura sedimentaria genuina junto a series de minerales de
+#:   colección mal categorizados (ej. 15 fotos de asfaltita etiquetada
+#:   "Sedimentary rocks" en Commons, con fondo de estudio que el filtro de
+#:   píxeles no detecta porque el espécimen llena el encuadre).
+#: - "museum"/"博物館" en el filename o el título: apareció al curar proxies —
+#:   una foto de vitrina con cartelas y reflejos de vidrio (fondo no uniforme,
+#:   tampoco detectable por píxeles) junto a especímenes de museo fotografiados
+#:   limpio, sin vitrina visible.
+#:
+#: En ambos casos la decisión no es automatizable de forma confiable: se marca
+#: `needs_review` y se decide con la imagen delante, en la hoja de contacto.
 _SPECIMEN_LANGUAGE = ("specimen",)
+_MUSEUM_LANGUAGE = ("museum", "museo", "博物館", "vitrine", "vitrina", "display case")
 
 
-def _flag_specimen_language(rec: ImageRecord) -> None:
-    text = (rec.description or "").lower()
-    if any(term in text for term in _SPECIMEN_LANGUAGE):
+def _flag_studio_language(rec: ImageRecord) -> None:
+    description = (rec.description or "").lower()
+    if any(term in description for term in _SPECIMEN_LANGUAGE):
         note = "descripción menciona 'specimen': revisar si es foto de estudio"
+        if note not in rec.needs_review:
+            rec.needs_review.append(note)
+
+    # El nombre de un museo suele colarse en el filename o el título de
+    # Commons aunque no aparezca en la descripción — a diferencia de
+    # "specimen", que sí solía estar en la descripción.
+    wide_text = " ".join([rec.filename, rec.origin_title or ""]).lower()
+    if any(term in wide_text for term in _MUSEUM_LANGUAGE):
+        note = "nombre menciona museo/vitrina: revisar si es foto de estudio"
         if note not in rec.needs_review:
             rec.needs_review.append(note)
 
 
 def load_group_index(config_path: Path | None = None) -> dict[str, str]:
-    """Categoría en minúsculas -> nombre del grupo."""
+    """Categoría o término de búsqueda en minúsculas -> nombre del grupo.
+
+    Indexa `wikimedia_categories` **y** `search_terms`. Falta el segundo
+    bloque hacía que `classify(..., overwrite=True)` mandara a UNCLASSIFIED
+    cualquier record descubierto por texto libre en vez de por categoría de
+    Commons: `record_from_page`/`recover._apply_metadata` añaden el término de
+    búsqueda que encontró la imagen a `rec.categories` (así es como
+    `wm_anthropocene_coastal_dune.jpg` terminó con `anthropocene plastic
+    sediment` en su lista), pero como ese término sólo vivía en `search_terms`
+    y no en `wikimedia_categories`, no había ninguna entrada del índice que lo
+    reconociera. `fetch --klass X` ya fija la clase correcta al descubrir, así
+    que esto no importaba mientras nadie pidiera `--overwrite` — hasta que se
+    pidió, y una imagen real de plastiglomerado (una de sólo dos) perdió su
+    clase y su caption en la misma pasada.
+    """
     config_path = config_path or (
         Path(__file__).resolve().parents[2] / "config" / "queries.yaml"
     )
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     index: dict[str, str] = {}
-    for group, cats in (data.get("wikimedia_categories") or {}).items():
-        for cat in cats or []:
-            index[cat.lower()] = group
+    for block in ("wikimedia_categories", "search_terms"):
+        for group, items in (data.get(block) or {}).items():
+            for item in items or []:
+                index[item.lower()] = group
     return index
 
 
@@ -118,7 +150,7 @@ def classify_all(
         counts[klass.value] += 1
 
         if not rec.rejected:
-            _flag_specimen_language(rec)
+            _flag_studio_language(rec)
 
         # Una imagen que sólo aparece en categorías de mineral de colección es
         # la contaminación que ya detectó el filtro de fondo de estudio. Se

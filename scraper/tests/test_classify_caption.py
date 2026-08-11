@@ -38,6 +38,23 @@ def test_clasifica_proxy(index):
     assert classify(_rec(categories=["Slag"]), index) is ImageClass.PROXY
 
 
+def test_el_indice_tambien_incluye_search_terms(index):
+    """No sólo `wikimedia_categories`: ver el docstring de `load_group_index`."""
+    assert index["anthropocene plastic sediment"] == "plastiglomerado"
+    assert index["industrial slag texture"] == "proxy"
+
+
+def test_clasifica_por_termino_de_busqueda_libre(index):
+    """El caso real: un record descubierto por texto libre, no por categoría
+    curada de Commons — `record_from_page` añade el término que lo encontró
+    a `categories`, y sin indexar `search_terms` esto se iba a UNCLASSIFIED.
+    """
+    rec = _rec(
+        categories=["Anthropocene", "Coastal dunes of Italy", "anthropocene plastic sediment"]
+    )
+    assert classify(rec, index) is ImageClass.PLASTIGLOMERADO
+
+
 def test_plastiglomerado_gana_los_empates(index):
     """Es la clase escasa: perder una real dentro de estratos cuesta más."""
     rec = _rec(categories=["Sedimentary rocks", "Plastiglomerate"])

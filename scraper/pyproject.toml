@@ -21,6 +21,21 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
+# Sólo hace falta para `codice-scraper synthesize`. El resto del paquete no
+# los importa, así que quedan fuera de las dependencias base.
+#
+# `tokenizers<0.23` es explícito porque `diffusers`/`transformers` no lo fijan
+# ellos mismos: instalar sin este techo trae `0.23.0rc0` (release candidate),
+# que rompe el tokenizer CLIP de SDXL con
+# `RobertaProcessing.__new__() got an unexpected keyword argument 'cls'`.
+# Se reprodujo en vivo instalando este extra sobre un `transformers` ya
+# presente en el entorno.
+synth = [
+    "torch>=2.4",
+    "diffusers>=0.30",
+    "accelerate>=0.30",
+    "tokenizers<0.23",
+]
 
 [project.scripts]
 codice-scraper = "codice_scraper.__main__:main"

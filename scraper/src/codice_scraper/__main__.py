@@ -287,6 +287,57 @@ def cmd_relicense(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- synthesize -------------------------------------------------------
+
+
+def cmd_synthesize(args: argparse.Namespace) -> int:
+    """Genera variaciones sintéticas de plastiglomerado con SDXL + IP-Adapter.
+
+    Requiere una GPU CUDA local y el extra `synth` (`pip install -e .[synth]`).
+    No escribe el manifest hasta que las imágenes ya están guardadas en disco,
+    para que una corrida a medias no deje records sin archivo.
+    """
+    from .synthesize import synthesize
+
+    reference_dir = (
+        Path(args.reference_dir)
+        if args.reference_dir
+        else paths.DATASET_DIR / "train" / "15_02_real_plastiglomerado"
+    )
+    if not reference_dir.exists():
+        print(f"error: no existe {reference_dir}", file=sys.stderr)
+        print("       corre 'codice-scraper export' primero, o pasa --reference-dir", file=sys.stderr)
+        return 1
+
+    print(f"Referencias: {reference_dir}")
+    print(f"Generando {args.count} imágenes (steps={args.steps}, ip_scale={args.ip_adapter_scale})…\n")
+
+    try:
+        stats, records = synthesize(
+            reference_dir=reference_dir,
+            output_dir=paths.INCOMING_DIR,
+            count=args.count,
+            steps=args.steps,
+            ip_adapter_scale=args.ip_adapter_scale,
+            seed=args.seed,
+            progress=lambda it, total: tqdm(it, total=total, desc="  generando", unit="img"),
+        )
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    print(stats.render())
+
+    manifest = Manifest(paths.MANIFEST_PATH).load()
+    for rec in records:
+        manifest.upsert(rec)
+    manifest.save()
+    print(f"\nManifest actualizado: {paths.MANIFEST_PATH}  (+{len(records)} sintéticas)")
+    print("\nSiguiente:  codice-scraper sheet --klass 04_synth_plastiglomerado")
+    print("            codice-scraper export")
+    return 0
+
+
 # --- classify -------------------------------------------------------------
 
 
@@ -583,6 +634,16 @@ def build_parser() -> argparse.ArgumentParser:
         "relicense", help="reaplica la política de licencias sobre el manifest"
     )
     rl.set_defaults(func=cmd_relicense)
+
+    sy = sub.add_parser(
+        "synthesize", help="genera variaciones sintéticas de plastiglomerado (SDXL + IP-Adapter, GPU local)"
+    )
+    sy.add_argument("--count", type=int, default=100)
+    sy.add_argument("--steps", type=int, default=30)
+    sy.add_argument("--ip-adapter-scale", type=float, default=0.35)
+    sy.add_argument("--seed", type=int, default=7797676568)
+    sy.add_argument("--reference-dir", help="por defecto, dataset/train/15_02_real_plastiglomerado")
+    sy.set_defaults(func=cmd_synthesize)
 
     c = sub.add_parser("classify", help="asigna clase según categorías de Commons")
     c.add_argument("--overwrite", action="store_true", help="reclasificar lo ya clasificado")
