@@ -20,6 +20,12 @@ Three independent parts:
 
 ## Commands
 
+**Fresh machine: follow `INIT.md`.** It is the verified setup runbook (venv,
+`pip install -e ".[dev]"`, and the three checks whose expected values are exact:
+`145 passed`, 511 active records, 14 subcommands). It also documents what a clone
+does *not* contain and how to get the images back — read it before assuming a
+missing-image symptom is a bug.
+
 All scraper commands run from `scraper/`:
 
 ```bash
@@ -189,6 +195,32 @@ not a Commons download, and `ATTRIBUTIONS.md` needs that distinction to stay hon
 `04_SDXL_LoRA_Convert_Use.ipynb` exists for) and supports the per-folder repeat mechanism the four
 classes rely on. See `runpod/README.md` for the full training-parameter rationale (bucketing, no
 flip-aug, VAE fp16-fix, etc.) and `scraper/README.md` for the dataset-curation rationale.
+
+### Why dataset images are never versioned
+
+`.gitignore` excludes `dataset/**` except `manifest.jsonl` and `ATTRIBUTIONS.md`, so a clone is
+~9 MB against 4.4 GB on disk (2.4 GB `_incoming/`, 2.1 GB `train/` — which is a duplicate copy of
+the selected 511). Three reasons, and the first is not about size:
+
+- **`_incoming/` holds 20 images whose license is `UNKNOWN`**, on purpose: the mark-don't-delete
+  design keeps rejected material next to accepted material in the same directory. Committing
+  `dataset/**` wholesale publishes unvetted images in a publicly exhibited project, bypassing the
+  license policy that the three enforcement points above exist to guarantee. Git LFS doesn't help —
+  the problem is publication, not size.
+- **Git history is permanent.** Removing an image later needs a history rewrite and a force-push.
+  This repo already paid that cost once, to drop 217 MB of reference notebooks.
+- **The manifest is the part that can't be rebuilt.** Losing the original filenames is what
+  destroyed provenance in the first scrape and forced the pHash recovery. Wikimedia pixels can
+  always be re-downloaded; `download_url` + `sha256` + license + author + caption cannot.
+
+Image backups belong in the shared Drive, not in git. **The 100 synthetics are the only
+irrecoverable files** — no `download_url`, and regenerating them needs a GPU and isn't
+bit-identical across hardware.
+
+Related trap: **`fetch` does not rehydrate a manifest whose files are missing.** Dedup compares the
+URL against the manifest without checking the disk (`pipeline.py:203`), so on a fresh clone it
+reports everything as already known and downloads nothing (measured: 141 discovered / 141 known,
+zero files present). Re-downloading means walking the manifest's `download_url`s directly.
 
 ## External dependencies with known constraints
 
