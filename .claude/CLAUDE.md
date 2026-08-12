@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+It lives at `.claude/CLAUDE.md`, not the repo root — both are supported project-instruction locations
+and load identically. `.claude/` is versioned so these instructions travel with the repo; only Claude
+Code's per-machine runtime state under `.claude/` is gitignored. Don't "fix" this by moving the file
+to the root or by adding an `@` import shim — nothing is broken.
+
 ## Project
 
 This repo builds the training dataset and infrastructure for `codice_geo`, a SDXL LoRA trained on
@@ -20,7 +25,7 @@ Three independent parts:
 
 ## Commands
 
-**Fresh machine: follow `INIT.md`.** It is the verified setup runbook (venv,
+**Fresh machine: follow `INIT.md` at the repo root.** It is the verified setup runbook (venv,
 `pip install -e ".[dev]"`, and the three checks whose expected values are exact:
 `145 passed`, 511 active records, 14 subcommands). It also documents what a clone
 does *not* contain and how to get the images back — read it before assuming a

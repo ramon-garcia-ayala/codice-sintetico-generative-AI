@@ -25,6 +25,23 @@ reports/
 scraper/config/secrets.yaml
 .env
 
+# `.claude/` SÍ se versiona: `.claude/CLAUDE.md` son las instrucciones del
+# proyecto y deben viajar con el repo (ubicación soportada, equivalente a
+# ./CLAUDE.md). Lo que se excluye es el estado de runtime de Claude Code, que es
+# local de cada máquina y reaparece solo. Sin estas reglas, en otra computadora
+# ese ruido aparece como cambios sin rastrear y se acaba commiteando.
+.claude/settings.local.json
+.claude/scheduled_tasks.json
+.claude/scheduled_tasks.lock
+.claude/agent-registry.json
+.claude/assistant-daemon-state.json
+.claude/first-run
+.claude/agent-memory-local/
+.claude/routines/.state/
+.claude/worktrees/
+.claude/checkpoints/
+.claude/mailbox/
+
 # Pesos de modelos
 *.safetensors
 *.ckpt
