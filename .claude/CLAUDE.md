@@ -204,8 +204,8 @@ flip-aug, VAE fp16-fix, etc.) and `scraper/README.md` for the dataset-curation r
 ### Why dataset images are never versioned
 
 `.gitignore` excludes `dataset/**` except `manifest.jsonl` and `ATTRIBUTIONS.md`, so a clone is
-~9 MB against 4.4 GB on disk (2.4 GB `_incoming/`, 2.1 GB `train/` — which is a duplicate copy of
-the selected 511). Three reasons, and the first is not about size:
+~9 MB against 4.3 GB on disk (2.4 GB `_incoming/`, 1.9 GB `train/` — which is a duplicate copy of
+the selected 471). Three reasons, and the first is not about size:
 
 - **`_incoming/` holds 20 images whose license is `UNKNOWN`**, on purpose: the mark-don't-delete
   design keeps rejected material next to accepted material in the same directory. Committing

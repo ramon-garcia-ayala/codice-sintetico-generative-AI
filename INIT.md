@@ -14,7 +14,7 @@ El clon pesa **~9 MB**. Lo que falta, falta a propósito:
 
 | Ausente | Tamaño | Por qué |
 |---|---:|---|
-| Las imágenes del dataset | 4.4 GB | Decisión explícita: ver *"Why dataset images are never versioned"* en `.claude/CLAUDE.md` |
+| Las imágenes del dataset | 4.3 GB | Decisión explícita: ver *"Why dataset images are never versioned"* en `.claude/CLAUDE.md` |
 | `scraper/synth_refs/` | 8 MB | Copias/recortes de imágenes que ya viven en `dataset/`; reconstrucción documentada en `scraper/README.md` |
 | `scraper/config/secrets.yaml` | — | Credenciales de Flickr |
 

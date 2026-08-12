@@ -58,8 +58,8 @@ python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -e ".[dev]"   # Windows
 # ./.venv/bin/python -m pip install -e '.[dev]'          # macOS / Linux
 
-./.venv/Scripts/python.exe -m pytest -q                  # → 145 passed
-./.venv/Scripts/python.exe -m codice_scraper report      # → 1112 entradas, 511 activas
+./.venv/Scripts/python.exe -m pytest -q                  # → 146 passed
+./.venv/Scripts/python.exe -m codice_scraper report      # → 1112 entradas, 471 activas
 ```
 
 Las tres verificaciones pasan **sin red, sin GPU, sin el Drive montado y sin una
@@ -89,10 +89,10 @@ duplica entradas. Detalle completo en [`scraper/README.md`](scraper/README.md).
 | | |
 |---|---:|
 | Entradas en el manifest | 1112 |
-| **Aprobadas para entrenar** | **511** |
-| Descartadas (marcadas, no borradas) | 601 |
-| Con procedencia verificada | 511 / 511 |
-| Con caption | 511 / 511 |
+| **Aprobadas para entrenar** | **471** |
+| Descartadas (marcadas, no borradas) | 641 |
+| Con procedencia verificada | 471 / 471 |
+| Con caption | 471 / 471 |
 
 Las cuatro clases y sus repeticiones por época en kohya:
 
@@ -100,7 +100,7 @@ Las cuatro clases y sus repeticiones por época en kohya:
 |---|---:|---:|---|
 | `01_real_estratos` | 10 | 216 | Estratos, roca sedimentaria, afloramientos |
 | `02_real_plastiglomerado` | 15 | 2 | Plastiglomerado real documentado |
-| `03_proxy_materiales` | 8 | 193 | Escoria, *pyroplastics*, brechas con inclusiones |
+| `03_proxy_materiales` | 8 | 153 | Escoria, *pyroplastics*, brechas con inclusiones |
 | `04_synth_plastiglomerado` | 5 | 100 | Variaciones SDXL + IP-Adapter sobre las 2 reales |
 
 Los *repeats* —no la duplicación de archivos— son lo que equilibra clases de
