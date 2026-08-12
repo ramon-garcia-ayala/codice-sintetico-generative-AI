@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import csv
+import time
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -134,6 +136,32 @@ def test_reexportar_no_acumula_restos(source, tmp_path):
 
     folder = out / f"{CLASS_REPEATS[ImageClass.ESTRATOS]}_{ImageClass.ESTRATOS.value}"
     assert not folder.exists(), "la clase anterior debió limpiarse"
+
+
+def test_reexportar_sobrevive_al_borrado_diferido_de_windows(source, tmp_path, monkeypatch):
+    """En Windows el `mkdir` posterior al `rmtree` puede fallar con WinError 5
+    si otro proceso aún sostiene un handle. Como el `rmtree` ya ocurrió, no
+    reintentar deja el árbol borrado y aborta con traceback."""
+    out = tmp_path / "train"
+    export_kohya([_rec("estrato.jpg", ImageClass.ESTRATOS)], source, out)
+
+    real_mkdir = Path.mkdir
+    fallos = {"n": 2}
+
+    def mkdir_terco(self, *args, **kwargs):
+        if self == out and fallos["n"] > 0:
+            fallos["n"] -= 1
+            raise PermissionError(5, "Access is denied")
+        return real_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", mkdir_terco)
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+
+    stats = export_kohya([_rec("estrato.jpg", ImageClass.ESTRATOS)], source, out)
+
+    assert fallos["n"] == 0, "el reintento debió consumir los fallos simulados"
+    assert stats.total == 1
+    assert out.exists()
 
 
 def test_la_hoja_de_contacto_es_autonoma(source, tmp_path):

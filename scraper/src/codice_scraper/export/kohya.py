@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import shutil
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -110,6 +111,31 @@ def _normalize_and_copy(src: Path, dst: Path) -> bool:
         return True
 
 
+def _mkdir_after_rmtree(out_dir: Path, attempts: int = 10) -> None:
+    """Crea `out_dir` reintentando el `PermissionError` de Windows.
+
+    En Windows, `rmtree` puede devolver antes de que el directorio deje de
+    existir de verdad: si un antivirus, el indexador o el cliente de Drive
+    mantienen un handle abierto, el borrado queda pendiente y el `mkdir`
+    inmediato falla con `WinError 5`. Se reproduce corriendo `export` sobre un
+    árbol de 511 imágenes recién escrito.
+
+    Importa porque el `rmtree` ya ocurrió: sin reintento, `export` deja el árbol
+    de entrenamiento **borrado** y aborta con un traceback, que es el peor
+    resultado posible de un comando cuyo propósito es reconstruirlo.
+    """
+    delay = 0.1
+    for attempt in range(attempts):
+        try:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 2.0)
+
+
 def export_kohya(
     records: list[ImageRecord],
     source_dir: Path,
@@ -125,7 +151,7 @@ def export_kohya(
 
     if clean and out_dir.exists():
         shutil.rmtree(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    _mkdir_after_rmtree(out_dir)
 
     csv_rows: list[tuple[str, str]] = []
 

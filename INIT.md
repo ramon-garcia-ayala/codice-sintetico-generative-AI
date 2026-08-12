@@ -19,7 +19,7 @@ El clon pesa **~9 MB**. Lo que falta, falta a propósito:
 | `scraper/config/secrets.yaml` | — | Credenciales de Flickr |
 
 **Lo que sí viene, y es lo importante:** `dataset/manifest.jsonl` (1.5 MB) con la
-procedencia completa de las 511 imágenes aprobadas — URL, `sha256`, `phash`,
+procedencia completa de las 471 imágenes aprobadas — URL, `sha256`, `phash`,
 licencia, autor, categorías y caption. Los píxeles de Wikimedia se vuelven a
 bajar; los metadatos no se reconstruyen (perderlos fue el daño original que hubo
 que rescatar por pHash). Por eso el manifest se versiona y las imágenes no.
@@ -87,7 +87,7 @@ pipeline** — `classify --overwrite` y compañía pueden empeorar el estado
 ```bash
 ./.venv/Scripts/python.exe -m pytest -q
 ```
-→ **`145 passed`** (~6 s).
+→ **`146 passed`** (~6 s).
 
 ```bash
 ./.venv/Scripts/python.exe -m codice_scraper report
@@ -95,11 +95,11 @@ pipeline** — `classify --overwrite` y compañía pueden empeorar el estado
 → debe reproducir exactamente:
 
 ```
-Entradas         1112        Activas   511        Descartadas   601
+Entradas         1112        Activas   471        Descartadas   641
 01_real_estratos  216 | 02_real_plastiglomerado  2
-03_proxy_materiales 193 | 04_synth_plastiglomerado 100
-Con procedencia   511/511  (100%)
-Con caption       511/511
+03_proxy_materiales 153 | 04_synth_plastiglomerado 100
+Con procedencia   471/471  (100%)
+Con caption       471/471
 ```
 
 ```bash
@@ -129,7 +129,7 @@ $env:CODICE_DRIVE = "G:\...\CODICE SIN"             # PowerShell
 `ingest` recupera las **282 heredadas**. Si el equipo respaldó el dataset
 completo en el Drive, copia esos archivos a `dataset/_incoming/` y corre
 `codice-scraper export` directamente — el manifest ya tiene clase y caption de
-las 511, no hay que re-clasificar nada.
+las 471, no hay que re-clasificar nada.
 
 `DRIVE_ROOT` es de **sólo lectura** para este paquete: `ingest` copia hacia
 `dataset/_incoming/` y ningún comando escribe de vuelta. No cambies eso.
@@ -138,7 +138,7 @@ las 511, no hay que re-clasificar nada.
 compara la URL contra el manifest sin comprobar si el archivo existe en disco
 (`pipeline.py:203`). Sobre un clon limpio el resultado real fue
 `Descubiertas 141 / Ya conocidas 141` con cero archivos en disco y cero
-descargas. Para re-bajar las 411 de Wikimedia hay que ir contra los
+descargas. Para re-bajar las 371 de Wikimedia hay que ir contra los
 `download_url` del manifest (y validar con el `sha256` guardado), no vía `fetch`.
 
 **Las 100 sintéticas no se recuperan de ninguna de las dos vías.** No están en
@@ -190,4 +190,4 @@ parámetros en `runpod/README.md`.
    las cláusulas denegadas se comprueban **antes** de los marcadores permitidos
    (`"cc by" in "cc by-nc-nd"` es `True`). Tras editar `licenses.py`, correr
    `codice-scraper relicense`.
-4. Tras cualquier cambio: `pytest -q` debe seguir en **145 passed**.
+4. Tras cualquier cambio: `pytest -q` debe seguir en **146 passed**.

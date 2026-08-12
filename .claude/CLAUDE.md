@@ -27,7 +27,7 @@ Three independent parts:
 
 **Fresh machine: follow `INIT.md` at the repo root.** It is the verified setup runbook (venv,
 `pip install -e ".[dev]"`, and the three checks whose expected values are exact:
-`145 passed`, 511 active records, 14 subcommands). It also documents what a clone
+`146 passed`, 471 active records, 14 subcommands). It also documents what a clone
 does *not* contain and how to get the images back — read it before assuming a
 missing-image symptom is a bug.
 
